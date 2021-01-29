@@ -13,5 +13,9 @@ all: $(EE_LIB)
 clean:
 	rm -f *.a *.o *.map $(EE_LIB)
 
-include ../Makefile.pref
-include ../Makefile.eeglobal
+# include ../Makefile.pref
+# include ../Makefile.eeglobal
+
+#Include preferences
+include $(PS2SDK)/samples/Makefile.pref
+include $(PS2SDK)/samples/Makefile.eeglobal
