@@ -3,9 +3,9 @@
 #
 
 EE_LIB  = ../lib/libps2gdbStub.a
-EE_OBJS = ps2gdbStub.o gdb-low.o
+EE_OBJS = hander.o ps2gdbStub.o gdb-low.o
 
-EE_CFLAGS +=	-g
+EE_CFLAGS +=	-DDEBUG -g -Wno-strict-aliasing
 EE_LDFLAGS +=	-Wl,-Map,ps2gdbStub.map -L. -L../lib -L$(PS2SDK)/ee/lib
 
 all: $(EE_LIB)

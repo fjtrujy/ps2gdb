@@ -80,8 +80,10 @@ extern void breakinst(void);
 static int computeSignal(int tt);
 static int hex(unsigned char ch);
 static int hexToInt(char **ptr, int *intValue);
-static unsigned char *mem2hex(char *mem, char *buf, int count, int may_fault);
+static char *mem2hex(char *mem, char *buf, int count, int may_fault);
 void handle_exception( gdb_regs_ps2 *regs );
+
+void jander(void);
 
 // These are the gdb buffers. For the tcpip comms, there are seperate buffers, which fill input_buffer and output_buffer when
 // needed.
@@ -119,7 +121,7 @@ int thread_id_g;
 
 extern void gdbstub_shutdown_poll(int alarmid, unsigned short us, void *vp );
 
-static const unsigned char *regName[NUMREGS] =
+static const char *regName[NUMREGS] =
 {
 	// GPRs (0-31)
     "zero", "at",   "v0",   "v1",   "a0",   "a1",   "a2",   "a3",
@@ -170,8 +172,8 @@ int cs_g;
 int alarmid_g;
 
 // Don't want to wait around too much.
-struct timeval tv_0_g = { 0, 1 };
-struct timeval tv_1_g = { 0, 1 };
+struct timeval tv_0_g = { 5, 0 };
+struct timeval tv_1_g = { 5, 0 };
 
 int gdbstub_pending_recv()
 {
@@ -187,12 +189,17 @@ int gdbstub_pending_recv()
 
 int gdbstub_ready_to_send()
 {
+	printf("gdbstub_ready_to_send 0\n");
 	if( select( cs_g + 1, (fd_set *)0, &comms_fd_g, (fd_set *)0, &tv_0_g ) >= 1 ) {
+		printf( "gdbstub_ready_to_send 1\n");
 		if( FD_ISSET( cs_g, &comms_fd_g ) ) {
+			printf( "gdbstub_ready_to_send 2\n");
 			return 1;
 		}
+		printf( "gdbstub_ready_to_send 3\n");
 	}
 
+	printf( "gdbstub_ready_to_send 4\n");
 	return 0;
 }
 
@@ -236,8 +243,11 @@ void wait_a_while( int time )
 {
 	int i, j;
 
-	for( i = 0; i < 10000000; i ++ ) {
-		for( j = 0; j < time; j ++ ) {
+	for( i = 0; i <= 10000000; i ++ ) {
+		for( j = 0; j <= time; j ++ ) {
+			if (i = 10000000 && j == time) {
+				// printf("in the while\n");
+			}
 		}
 	}
 }
@@ -271,14 +281,14 @@ int gdbstub_error( char *format, ... )
 	va_list args;
 	int ret;
 
-	while(1)
-	{
+	// while(1)
+	// {
 		vprintf("GDBSTUBERROR :: ", 0);
 		va_start(args, format);
 		ret = vprintf(format, args);
 		va_end(args);
-		wait_a_while(1);
-	}
+		// wait_a_while(1);
+	// }
 
 	return ret;
 }
@@ -359,7 +369,7 @@ static void getpacket(char *buffer)
 	int i;
 	int count;
 	unsigned char ch;
-
+	printf("%s, %s:%i\n", __FUNCTION__, __FILE__, __LINE__);
 	do {
 		// Wait for the start character, ignore all other characters.
 		while ((ch = (getDebugChar() & 0x7f)) != '$') ;
@@ -408,6 +418,7 @@ static void getpacket(char *buffer)
 		}
 	}
 	while (checksum != xmitcsum);
+	printf("$s, %s:%i\n", __FUNCTION__, __FILE__, __LINE__);
 }
 
 
@@ -455,14 +466,23 @@ static void putpacket(char *buffer)
 		checksum += ch;
 		count++;
 	}
+	gdbstub_printf( DEBUG_COMMS, "First while\n");
 	gdbstub_send_buffer_g[count+1]='#';
 	gdbstub_send_buffer_g[count+2]=hexchars[checksum >> 4];
 	gdbstub_send_buffer_g[count+3]=hexchars[checksum & 0xf];
-	while( !gdbstub_ready_to_send() ) {
-		;
-	}
+	gdbstub_printf( DEBUG_COMMS, "before second while\n");
+	// while( !gdbstub_ready_to_send() ) {
+	// 	;
+	// }
+	!gdbstub_ready_to_send();
+	gdbstub_printf( DEBUG_COMMS, "after second while\n");
+	gdbstub_printf( DEBUG_COMMS, "FORCING +S#00\n");
+	sent_size = send( cs_g, "+S#00", 5, 0 );
+	gdbstub_printf( DEBUG_COMMS, "SENT FORCING +S#00\n");
 	sent_size = send( cs_g, gdbstub_send_buffer_g, count+4, 0 );
-	while ((getDebugChar() & 0x7f) != '+');		// Wait for ack.
+	gdbstub_printf( DEBUG_COMMS, "before third while\n");
+	// while ((getDebugChar() & 0x7f) != '+');		// Wait for ack.
+	gdbstub_printf( DEBUG_COMMS, "after third while\n");
 }
 
 // Indicate to caller of mem2hex or hex2mem that there
@@ -474,7 +494,7 @@ static volatile int mem_err = 0;
 // Return a pointer to the last char put in buf (null), in case of mem fault, return 0.
 // If MAY_FAULT is non-zero, then we will handle memory faults by returning a 0,
 // else treat a fault like any other fault in the stub.
-static unsigned char *mem2hex(char *mem, char *buf, int count, int may_fault)
+static char *mem2hex(char *mem, char *buf, int count, int may_fault)
 {
 	unsigned char ch;
 
@@ -902,14 +922,14 @@ void gdbstub_show_ps2_regs( gdb_regs_ps2 *regs, int except_num, int to_screen, i
 	// Print out the gprs.
     for(i = 0; i < 16; i++) {
         printf_p("%4s:%016lx%016lx %4s:%016lx%016lx\n", 
-                   regName[i],				((long*)&regs->reg0)[(i*2)+1],				((long*)&regs->reg0)[i*2],
-                   regName[i+16],			((long*)&regs->reg0)[(i+16)*2+1],			((long*)&regs->reg0)[(i+16)*2] );
+                   regName[i],				((long long*)&regs->reg0)[(i*2)+1],				((long long*)&regs->reg0)[i*2],
+                   regName[i+16],			((long long*)&regs->reg0)[(i+16)*2+1],			((long long*)&regs->reg0)[(i+16)*2] );
 	}
 
 	// Print out hi and lo. on ps2 these are 128 bit.
     printf_p("\n%4s:%016lx%016lx %4s:%016lx%016lx\n", 
-                regName[32],				((long*)&regs->lo)[1],					((long*)&regs->lo)[0],
-                regName[33],				((long*)&regs->hi)[1],					((long*)&regs->hi)[0] );
+                regName[32],				((long long*)&regs->lo)[1],					((long long*)&regs->lo)[0],
+                regName[33],				((long long*)&regs->hi)[1],					((long long*)&regs->hi)[0] );
 
 	// Print out the floating point regs. There's cp1_acc as well, but I leave printing the ps2 registers at the end.
 	if( !to_screen )
@@ -956,8 +976,12 @@ void handle_exception( gdb_regs_ps2 *ps2_regs )
 	char				*ptr, *ptr2;
 	struct gdb_regs		*regs = &gdbstub_regs;
 
+	printf("%s, %s:%i\n", __FUNCTION__, __FILE__, __LINE__);
+
 	// I probably flush the caches unnessisarily, in the process of 'bodging it until it works'.
 	flush_cache_all();
+
+	// putpacket("+$#00");
 
 	// Make the registers 'normal' - i.e. 32 bit. The remote GDB side never sees the 128 bit ps2_regs, only ever regs.
 	// We put the changed values back just before exiting this function.
@@ -1056,6 +1080,7 @@ void handle_exception( gdb_regs_ps2 *ps2_regs )
 
 	// put the packet.
 	*ptr++ = 0;
+	printf("%s, %s:%i\n", __FUNCTION__, __FILE__, __LINE__);
 	putpacket(output_buffer);
 
 	// Wait for input from remote GDB.
@@ -1264,13 +1289,7 @@ void breakpoint(void)
 		return;
 	}
 
-	__asm__ __volatile__("			\n"
-"			.globl	breakinst	\n"
-"			.set	noreorder	\n"
-"			nop			\n"
-"breakinst:		break			\n"
-"			nop			\n"
-"			.set	reorder		\n");
+	jander();
 }
 
 
@@ -1325,17 +1344,22 @@ int gdbstub_net_open()
 
 	remote_len = sizeof( gdb_remote_addr_g );
 	cs_g = accept( sh_g, (struct sockaddr *)&gdb_remote_addr_g, &remote_len );
-
-	if ( cs_g < 0 ) {
+	while(cs_g < 0) {
 		gdbstub_error( "Accept failed.\n" );
-		disconnect( sh_g );							// Clean-up on failures.
-		return -1;
+		cs_g = accept( sh_g, (struct sockaddr *)&gdb_remote_addr_g, &remote_len );
 	}
+	// if ( cs_g < 0 ) {
+	// 	// gdbstub_error( "Accept failed.\n" );
+	// 	disconnect( sh_g );							// Clean-up on failures.
+	// 	return -1;
+	// }
 
 	FD_ZERO( &comms_fd_g );
 	FD_SET( cs_g, &comms_fd_g );
 
 	gdbstub_printf( DEBUG_COMMSINIT, "accept is %d\n", cs_g );
+
+	gdbstub_printf( DEBUG_COMMSINIT, "comms_fd_g is %d\n", comms_fd_g );
 
 	// Turn off non-blocking. Not really sure about this.
 	tmp = 0;
