@@ -317,9 +317,9 @@ char getDebugChar()
 	}
 
 	// Await communications.
-	while( !gdbstub_pending_recv() ) {
-		putchar(0);
-	}
+	//while( !gdbstub_pending_recv() ) {
+	//	putchar(0);
+	//}
 
 	// Take it.
 	recvd_chars = recv( cs_g, gdbstub_recv_buffer_g, SIZE_GDBSTUB_TCP_BUFFER, 0 );
@@ -347,9 +347,9 @@ int putDebugChar( char c )
 	ch[0] = c;
 	ch[1] = 0x0;
 
-	while( !gdbstub_ready_to_send() ) {
-		;
-	}
+	//while( !gdbstub_ready_to_send() ) {
+	//	;
+	//}
 	sent_size = send( cs_g, ch, 1, 0 );
 	if( sent_size != 1 ) {
 		gdbstub_error("Couldn't send a char %c\n", c );
@@ -470,19 +470,19 @@ static void putpacket(char *buffer)
 	gdbstub_send_buffer_g[count+1]='#';
 	gdbstub_send_buffer_g[count+2]=hexchars[checksum >> 4];
 	gdbstub_send_buffer_g[count+3]=hexchars[checksum & 0xf];
-	gdbstub_printf( DEBUG_COMMS, "before second while\n");
+	//gdbstub_printf( DEBUG_COMMS, "before second while\n");
 	// while( !gdbstub_ready_to_send() ) {
 	// 	;
 	// }
-	!gdbstub_ready_to_send();
-	gdbstub_printf( DEBUG_COMMS, "after second while\n");
-	gdbstub_printf( DEBUG_COMMS, "FORCING +S#00\n");
-	sent_size = send( cs_g, "+S#00", 5, 0 );
-	gdbstub_printf( DEBUG_COMMS, "SENT FORCING +S#00\n");
+	//!gdbstub_ready_to_send();
+	//gdbstub_printf( DEBUG_COMMS, "after second while\n");
+	//gdbstub_printf( DEBUG_COMMS, "FORCING +S#00\n");
+	//sent_size = send( cs_g, "+S#00", 5, 0 );
+	//gdbstub_printf( DEBUG_COMMS, "SENT FORCING +S#00\n");
 	sent_size = send( cs_g, gdbstub_send_buffer_g, count+4, 0 );
-	gdbstub_printf( DEBUG_COMMS, "before third while\n");
-	// while ((getDebugChar() & 0x7f) != '+');		// Wait for ack.
-	gdbstub_printf( DEBUG_COMMS, "after third while\n");
+	//gdbstub_printf( DEBUG_COMMS, "before third while\n");
+	while ((getDebugChar() & 0x7f) != '+');		// Wait for ack.
+	gdbstub_printf( DEBUG_COMMS, "ack receivef from gdb\n");
 }
 
 // Indicate to caller of mem2hex or hex2mem that there
